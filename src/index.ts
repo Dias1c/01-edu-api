@@ -2,15 +2,15 @@ import https from 'https'
 
 const storage = new Map()
 
-const base64urlUnescape = str =>
+const base64urlUnescape = (str: string) =>
   (str.length % 4 ? `${str}${'='.repeat(4 - (str.length % 4))}` : str)
     .replace(/-/g, '+')
     .replace(/_/g, '/')
 
-const decode = token =>
-  JSON.parse(Buffer.from(base64urlUnescape(token.split('.')[1]), 'base64'))
+const decode = (token: string) =>
+  JSON.parse(Buffer.from(base64urlUnescape(token.split('.')[1]), 'base64') as any)
 
-const fetch = (domain, path, headers, data) =>
+const fetch = (domain: string, path: string, headers?: any, data?: any): Promise<any> =>
   new Promise((resolve, reject) => {
     const req = https.request(
       {
@@ -44,7 +44,13 @@ const fetch = (domain, path, headers, data) =>
   })
 
 // requestToken, allows users to generate a new token
-const requestToken = async ({ domain, access_token }) => {
+const requestToken = async ({
+  domain,
+  access_token
+}: {
+  domain: string,
+  access_token: string
+}) => {
   const res = await fetch(domain, `/api/auth/token?token=${access_token}`)
   const token = res
   const payload = decode(token)
@@ -52,14 +58,14 @@ const requestToken = async ({ domain, access_token }) => {
   return { token, payload }
 }
 
-const isExpired = payload => {
+const isExpired = (payload: any) => {
   const diff = payload.exp - Date.now() / 1000
   // check if the token exists in the storage
   // if so, check if the token is still valid
   return storage.get('hasura-jwt-token') && Math.floor(diff) <= 0
 }
 
-const refreshToken = async (domain, token) => {
+const refreshToken = async (domain: string, token: string) => {
   const newToken = await fetch(domain, '/api/auth/refresh', {
     'x-jwt-token': token,
   })
@@ -70,7 +76,10 @@ const refreshToken = async (domain, token) => {
 // createClient, will init the client
 // generate a new token, application that init the client don't need to refresh the token
 // every time it expires, it refreshes the token automatically
-const createClient = async ({ domain, access_token }) => {
+const createClient = async ({ domain, access_token }: {
+  domain: string,
+  access_token: string
+}) => {
   let _pendingTokenQuery = requestToken({ domain, access_token })
   storage.set('hasura-jwt-token', (await _pendingTokenQuery).token)
 
@@ -87,7 +96,9 @@ const createClient = async ({ domain, access_token }) => {
   return {
     // run, will make part of the client, it should be used to run queries that
     // the application needs to run. Should be used like this: client.run({.....}))
-    run: async (query, variables) => {
+    run: async (query: string, variables?: {
+      [key in any]: any
+    }) => {
       const form = JSON.stringify({ query, variables })
       const body = await fetch(
         domain,
@@ -109,4 +120,7 @@ const createClient = async ({ domain, access_token }) => {
   }
 }
 
-export { createClient, requestToken, decode }
+type TUnboxPromise<T extends Promise<any>> = T extends Promise<infer U> ? U : never;
+type TClient = TUnboxPromise<ReturnType<typeof createClient>>
+
+export { createClient, requestToken, decode, TClient }
