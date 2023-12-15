@@ -1,9 +1,10 @@
 import { deepStrictEqual as eq, rejects } from 'assert'
 import https from 'https'
-import FormData from 'form-data'
-import { requestToken, decode, createClient } from './index.js'
+import { requestToken, decode, createClient, TClient } from './index.js'
 
-export const t = {}
+export const t: {
+  [key in string]: () => (Promise<void> | void)
+} = {}
 const domain = 'dev.01-edu.org'
 const bad_access_token = '427faa391a0d73a68b69d4d3b65796fd798e9156'
 const user = 'lee'
@@ -150,7 +151,7 @@ t['client.run: run mutation (not allowed)'] = async () => {
   )
 }
 
-let _timeOut
+let _timeOut: NodeJS.Timeout
 // not sure if applications need to do such a thing!! execute multiple runs at the same time
 // this will create conflicts between runs, if the token expires then the other
 // runs will try to refresh an already expired token !! this will return an error (Unauthorize)!
@@ -162,7 +163,7 @@ t[
     access_token,
   })
   const oldToken = client.storage.get('hasura-jwt-token')
-  const runMultiple = (client, print) => {
+  const runMultiple = (client: TClient, print?: boolean) => {
     _timeOut = setTimeout(() => {
       Promise.all([
         client.run('query{user{id,login}}'),
